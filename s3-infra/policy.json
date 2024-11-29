@@ -1,0 +1,19 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "allow-trafic-from-vpc-endpoint",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "*"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::romain-static-bucket-from-openshift-apac/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:sourceVpce": "vpce-f293419b"
+                }
+            }
+        }
+    ]
+}

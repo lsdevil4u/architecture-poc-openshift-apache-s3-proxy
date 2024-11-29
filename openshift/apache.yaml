@@ -1,0 +1,93 @@
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: apache-baseconfig
+  labels:
+    app: apache
+data:
+  custom.conf: |
+    # Default catch-all host, which must be first
+    <VirtualHost _default_:8080>
+      Redirect 404 /
+    </VirtualHost>
+    # Then include user-provided configuration
+    IncludeOptional conf.d/custom/*.conf
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache
+spec:
+  selector:
+    matchLabels:
+      app: apache
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      volumes:
+        - name: baseconfig
+          configMap:
+            name: apache-baseconfig
+        - name: userconfig
+          configMap:
+            name: apache-userconfig
+      containers:
+        - name: apache
+          image: registry.redhat.io/rhscl/httpd-24-rhel7
+          env:
+            - name: HTTP_PROXY
+              value: http://apac-aws-webproxy.service.cloud.local:3128
+            - name: HTTPS_PROXY
+              value: http://apac-aws-webproxy.service.cloud.local:3128
+          resources:
+            limits:
+              cpu: "256m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: baseconfig
+              mountPath: /etc/httpd/conf.d/custom.conf
+              subPath: custom.conf
+            - name: userconfig
+              mountPath: /etc/httpd/conf.d/custom/
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache
+  labels:
+    app: apache
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: apache
+
+---
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: apache
+  labels:
+    app: apache
+spec:
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: apache
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
